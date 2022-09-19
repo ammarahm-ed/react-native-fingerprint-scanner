@@ -22,12 +22,6 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.module.annotations.ReactModule;
 import com.facebook.react.bridge.UiThreadUtil;
 
-// for Samsung/MeiZu compat, Android v16-23
-import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter;
-import com.wei.android.lib.fingerprintidentify.FingerprintIdentify;
-import com.wei.android.lib.fingerprintidentify.base.BaseFingerprint.ExceptionListener;
-import com.wei.android.lib.fingerprintidentify.base.BaseFingerprint.IdentifyListener;
-
 import static android.content.Context.KEYGUARD_SERVICE;
 
 
@@ -44,9 +38,6 @@ public class ReactNativeFingerprintScannerModule
     private BiometricPrompt biometricPrompt;
     private KeyguardManager mKeyguardManager;
     private boolean mDeviceCredentialAllowed = false;
-
-    // for Samsung/MeiZu compat, Android v16-23
-    private FingerprintIdentify mFingerprintIdentify;
 
     public ReactNativeFingerprintScannerModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -77,7 +68,7 @@ public class ReactNativeFingerprintScannerModule
     }
 
     private boolean requiresLegacyAuthentication() {
-        return currentAndroidVersion() < 23;
+        return false
     }
 
     @TargetApi(23)
@@ -228,10 +219,6 @@ public class ReactNativeFingerprintScannerModule
 
     @ReactMethod
     public void release() {
-        if (requiresLegacyAuthentication()) {
-            getFingerprintIdentify().cancelIdentify();
-            mFingerprintIdentify = null;
-        }
 
         // consistent across legacy and current API
         if (biometricPrompt != null) {
@@ -267,35 +254,7 @@ public class ReactNativeFingerprintScannerModule
         mDeviceCredentialAllowed = allowed;
     }
 
-    // for Samsung/MeiZu compat, Android v16-23
-    private FingerprintIdentify getFingerprintIdentify() {
-        if (mFingerprintIdentify != null) {
-            return mFingerprintIdentify;
-        }
-        mReactContext.addLifecycleEventListener(this);
-        mFingerprintIdentify = new FingerprintIdentify(mReactContext);
-        mFingerprintIdentify.setSupportAndroidL(true);
-        mFingerprintIdentify.setExceptionListener(
-                new ExceptionListener() {
-                    @Override
-                    public void onCatchException(Throwable exception) {
-                        mReactContext.removeLifecycleEventListener(ReactNativeFingerprintScannerModule.this);
-                    }
-                }
-        );
-        mFingerprintIdentify.init();
-        return mFingerprintIdentify;
-    }
-
     private String legacyGetErrorMessage() {
-        if (!getFingerprintIdentify().isHardwareEnable()) {
-            return "FingerprintScannerNotSupported";
-        } else if (!getFingerprintIdentify().isRegisteredFingerprint()) {
-            return "FingerprintScannerNotEnrolled";
-        } else if (!getFingerprintIdentify().isFingerprintEnable()) {
-            return "FingerprintScannerNotAvailable";
-        }
-
         return null;
     }
 
@@ -307,41 +266,5 @@ public class ReactNativeFingerprintScannerModule
             ReactNativeFingerprintScannerModule.this.release();
             return;
         }
-
-        getFingerprintIdentify().resumeIdentify();
-        getFingerprintIdentify().startIdentify(MAX_AVAILABLE_TIMES, new IdentifyListener() {
-            @Override
-            public void onSucceed() {
-                promise.resolve(true);
-            }
-
-            @Override
-            public void onNotMatch(int availableTimes) {
-                if (availableTimes <= 0) {
-                    mReactContext.getJSModule(RCTDeviceEventEmitter.class)
-                            .emit("FINGERPRINT_SCANNER_AUTHENTICATION", "DeviceLocked");
-
-                } else {
-                    mReactContext.getJSModule(RCTDeviceEventEmitter.class)
-                            .emit("FINGERPRINT_SCANNER_AUTHENTICATION", "AuthenticationNotMatch");
-                }
-            }
-
-            @Override
-            public void onFailed(boolean isDeviceLocked) {
-                if(isDeviceLocked){
-                    promise.reject("AuthenticationFailed", "DeviceLocked");
-                } else {
-                    promise.reject("AuthenticationFailed", TYPE_FINGERPRINT_LEGACY);
-                }
-                ReactNativeFingerprintScannerModule.this.release();
-            }
-
-            @Override
-            public void onStartFailedByDeviceLocked() {
-                // the first start failed because the device was locked temporarily
-                promise.reject("AuthenticationFailed", "DeviceLocked");
-            }
-        });
     }
 }
