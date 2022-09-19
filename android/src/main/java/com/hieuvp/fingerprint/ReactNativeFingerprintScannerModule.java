@@ -68,7 +68,7 @@ public class ReactNativeFingerprintScannerModule
     }
 
     private boolean requiresLegacyAuthentication() {
-        return false
+        return false;
     }
 
     @TargetApi(23)
