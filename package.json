@@ -1,5 +1,5 @@
 {
-  "name": "react-native-fingerprint-scanner",
+  "name": "@ammarahmed/react-native-fingerprint-scanner",
   "version": "5.0.0",
   "description": "React Native Biometrics Scanner for Android and iOS",
   "main": "index.js",
